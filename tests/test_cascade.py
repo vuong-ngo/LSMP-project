@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from lsmp_ai.models.cascade_model import CascadeModel
 from lsmp_ai.models.isolation_forest_model import IForestModel
@@ -56,7 +57,7 @@ def test_cascade_fit_with_labels():
     # Verify predictions are produced without error
     preds = cascade.predict(X)
     assert len(preds) == 100
-    assert set(preds).issubset({"Normal", "Anomaly"})
+    assert set(preds).issubset({"Normal", "Anomaly", "Uncertain"})
 
 
 def test_cascade_sigmoid_clip():
@@ -71,4 +72,30 @@ def test_cascade_sigmoid_clip():
     assert not np.isinf(details["anomaly_score"]).any()
     assert (details["anomaly_score"] >= 0.0).all()
     assert (details["anomaly_score"] <= 1.0).all()
+
+
+def test_cascade_artifact_integrity_verification(tmp_path):
+    """Verify that CascadeModel verifies SHA-256 digests and raises SecurityError on tampering."""
+    from lsmp_ai.common.exceptions import SecurityError
+
+    X = np.random.randn(40, 14)
+    model = CascadeModel(threshold_percentile=80)
+    model.fit(X)
+
+    save_dir = str(tmp_path / "cascade_check")
+    model.save(save_dir)
+
+    # 1. Normal load succeeds
+    loaded = CascadeModel().load(save_dir)
+    assert loaded.is_fitted is True
+
+    # 2. Tamper with artifact binary
+    iforest_file = tmp_path / "cascade_check" / "iforest.joblib"
+    with open(iforest_file, "ab") as f:
+        f.write(b"\x00\x00tamper")
+
+    # 3. Tampered load raises SecurityError
+    with pytest.raises(SecurityError, match="Security integrity check FAILED"):
+        CascadeModel().load(save_dir)
+
 

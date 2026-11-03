@@ -3,9 +3,9 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-prepare_cicids2017 = pytest.importorskip("scripts.prepare_cicids2017")
-find_raw_data_dir = prepare_cicids2017.find_raw_data_dir
-map_cicids_to_lsmp_features = prepare_cicids2017.map_cicids_to_lsmp_features
+prepare_data = pytest.importorskip("scripts.prepare_data")
+find_raw_data_dir = prepare_data.find_raw_data_dir
+map_cicids_to_lsmp_features = prepare_data.map_cicids_to_lsmp_features
 from lsmp_ai.common.constants import FEATURE_COLUMNS
 
 

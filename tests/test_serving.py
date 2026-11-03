@@ -43,6 +43,7 @@ def sample_feature_df():
 
 
 def test_inference_service_load_and_infer(mock_db_client, mock_result_writer, mock_model_registry, sample_feature_df):
+    from lsmp_ai.feature_engineering.feature_pipeline import FeaturePipeline
     service = InferenceService(
         db_client=mock_db_client,
         result_writer=mock_result_writer,
@@ -58,7 +59,12 @@ def test_inference_service_load_and_infer(mock_db_client, mock_result_writer, mo
     assert service._model is not None
     mock_model_registry.load_latest.assert_called_once()
     
-    # 3. Test infer_on_features
+    # 3. Test missing feature pipeline raises RuntimeError (H4 protection)
+    with pytest.raises(RuntimeError, match="FeaturePipeline is missing"):
+        service.infer_on_features(sample_feature_df)
+
+    # 4. Attach valid feature pipeline and test infer_on_features
+    service._feat_pipeline = FeaturePipeline().fit(sample_feature_df)
     results_df = service.infer_on_features(sample_feature_df)
     assert len(results_df) == 5
     assert "anomaly_score" in results_df.columns
@@ -67,6 +73,7 @@ def test_inference_service_load_and_infer(mock_db_client, mock_result_writer, mo
 
 
 def test_inference_service_run_inference(mock_db_client, mock_result_writer, mock_model_registry, sample_feature_df):
+    from lsmp_ai.feature_engineering.feature_pipeline import FeaturePipeline
     mock_db_client.fetch_feature_vectors.return_value = sample_feature_df
     
     service = InferenceService(
@@ -75,6 +82,7 @@ def test_inference_service_run_inference(mock_db_client, mock_result_writer, moc
         model_registry=mock_model_registry,
     )
     service.load_model()
+    service._feat_pipeline = FeaturePipeline().fit(sample_feature_df)
     
     written_count = service.run_inference(limit=50)
     mock_db_client.fetch_feature_vectors.assert_called_with(limit=50)
@@ -121,18 +129,62 @@ def test_fastapi_writer_service_endpoints():
     
     client = TestClient(app)
     
-    # 1. Health check
+    # 1. Health check (unauthenticated public endpoint - S5: no reconnaissance data leaked)
     response = client.get("/health")
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["status"] == "healthy"
+    assert "model_version" not in json_data
+    assert "model_loaded" not in json_data
+    assert "database_configured" not in json_data
     
-    # 2. Process manual trigger endpoint
     payload = {
         "start_time": "2026-07-23T10:00:00",
         "end_time": "2026-07-23T10:05:00"
     }
-    with patch("lsmp_ai.serving.lsmp_writer_service.run_serve_pipeline"):
-        process_resp = client.post("/process", json=payload)
-        assert process_resp.status_code == 200
-        assert process_resp.json()["status"] == "queued"
+
+    # 2. Fail-Closed: LSMP_API_KEY is not set and LSMP_ALLOW_INSECURE_DEV=0 -> 500 error
+    with patch.dict(os.environ, {"LSMP_API_KEY": "", "LSMP_ALLOW_INSECURE_DEV": "0"}):
+        resp_unconfigured = client.post("/process", json=payload)
+        assert resp_unconfigured.status_code == 500
+        assert "misconfiguration" in resp_unconfigured.json()["detail"].lower()
+
+    # 3. Dev mode bypass: LSMP_ALLOW_INSECURE_DEV=1 allows execution without API key
+    with patch.dict(os.environ, {"LSMP_API_KEY": "", "LSMP_ALLOW_INSECURE_DEV": "1"}):
+        with patch("lsmp_ai.serving.lsmp_writer_service.run_serve_pipeline"):
+            resp_dev = client.post("/process", json=payload)
+            assert resp_dev.status_code == 200
+            assert resp_dev.json()["status"] == "queued"
+
+    # 4. Strict authentication with configured key:
+    test_key = "secure_secret_api_key_456"
+    with patch.dict(os.environ, {"LSMP_API_KEY": test_key, "LSMP_ALLOW_INSECURE_DEV": "0"}):
+        # 4a. Missing API key header -> 401
+        resp_missing = client.post("/process", json=payload)
+        assert resp_missing.status_code == 401
+
+        # 4b. Invalid API key header -> 403
+        resp_invalid = client.post("/process", json=payload, headers={"X-API-Key": "wrong_key"})
+        assert resp_invalid.status_code == 403
+
+        # 4c. Valid API key header -> 200 queued
+        with patch("lsmp_ai.serving.lsmp_writer_service.run_serve_pipeline"):
+            resp_valid = client.post("/process", json=payload, headers={"X-API-Key": test_key})
+            assert resp_valid.status_code == 200
+            assert resp_valid.json()["status"] == "queued"
+
+
+def test_rate_limiter_memory_safety_and_enforcement():
+    from lsmp_ai.serving.lsmp_writer_service import RateLimiter
+    # 1. Enforce max requests per IP
+    limiter = RateLimiter(max_requests=2, window_seconds=10, max_tracked_ips=5)
+    assert limiter.is_allowed("192.168.1.10") is True
+    assert limiter.is_allowed("192.168.1.10") is True
+    assert limiter.is_allowed("192.168.1.10") is False
+
+    # 2. Memory bound check: does not grow unbounded with spoofed IPs (S4 defense)
+    for i in range(20):
+        limiter.is_allowed(f"10.0.0.{i}")
+    assert len(limiter._requests) <= 5
+
+

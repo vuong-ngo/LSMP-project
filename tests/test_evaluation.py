@@ -1,7 +1,7 @@
 import numpy as np
 
 from lsmp_ai.evaluation.ablation import run_ablation_study
-from lsmp_ai.evaluation.metrics import compute_classification_metrics
+from lsmp_ai.evaluation.metrics import compute_classification_metrics, to_binary_labels
 
 
 def test_classification_metrics():
@@ -16,6 +16,11 @@ def test_classification_metrics():
     assert "f1_score" in metrics
     assert "roc_auc" in metrics
     assert 0 <= metrics["accuracy"] <= 1
+
+
+def test_four_state_primary_label_policy():
+    labels = np.array(["Normal", "Anomaly", "Suspicious", "Unknown", "Uncertain"])
+    assert to_binary_labels(labels).tolist() == [0, 1, -1, -1, -1]
 
 
 def test_ablation_study(sample_feature_df):

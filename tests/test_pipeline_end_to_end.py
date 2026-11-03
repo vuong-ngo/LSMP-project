@@ -22,10 +22,7 @@ def _create_mini_dataset(tmp_path: Path) -> str:
             "label": LABEL_ANOMALY if i < 20 else LABEL_NORMAL,
         }
         for col in FEATURE_COLUMNS:
-            if col == "hour_of_day":
-                row[col] = i % 24
-            else:
-                row[col] = float(np.random.rand())
+            row[col] = float(np.random.rand())
         rows.append(row)
 
     df = pd.DataFrame(rows)

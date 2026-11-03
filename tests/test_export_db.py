@@ -16,6 +16,8 @@ def test_export_models_to_db_without_db_url(monkeypatch):
     """Test that export utility cleanly returns False when DATABASE_URL is not set."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("POSTGRES_URL", raising=False)
+    monkeypatch.delenv("POSTGRES_USER", raising=False)
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
     success = export_models_to_db(db_url=None)
     assert success is False
 
@@ -38,11 +40,18 @@ def test_export_models_to_db_mocked(tmp_path, monkeypatch):
         }
     }
 
+    # Create temporary catalog for the test using tmp_path (avoids touching real models_store)
+    cat_file = tmp_path / "catalog.json"
+    cat_file.write_text(json.dumps(catalog_data))
+
     with patch("lsmp_ai.scripts.export_db.DBClient") as MockDBClient:
         mock_instance = MagicMock()
         mock_instance.db_url = "postgresql://postgres:postgres@localhost:5432/test_db"
         MockDBClient.return_value = mock_instance
 
-        success = export_models_to_db(db_url="postgresql://postgres:postgres@localhost:5432/test_db")
+        success = export_models_to_db(
+            db_url="postgresql://postgres:postgres@localhost:5432/test_db",
+            catalog_path=cat_file,
+        )
         assert success is True
         assert mock_instance.write_evaluation_metrics.call_count >= 1

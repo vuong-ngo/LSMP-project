@@ -44,20 +44,20 @@ def sample_features():
         data.append({
             "window_start": base_time - timedelta(minutes=i),
             "src_ip": f"192.168.1.{10 + i}",
-            "login_fail_count": 0.0,
-            "unique_failed_ip_count": 0.0,
-            "fail_success_ratio": 0.0,
-            "ip_entropy": 1.2,
-            "hour_of_day": 12,
-            "request_rate": 2.5,
-            "status_4xx_rate": 0.02,
-            "url_frequency": 0.3,
-            "user_agent_entropy": 0.5,
-            "method_distribution": 0.0,
-            "time_window_count": 10.0,
+            "auth_fail_count": 0.0,
+            "auth_success_count": 10.0,
+            "auth_fail_ratio": 0.0,
+            "distinct_username": 1.0,
+            "fail_interarrival_mean": 0.0,
+            "fail_interarrival_std": 0.0,
+            "http_req_rate": 2.5,
+            "http_4xx_ratio": 0.02,
+            "http_5xx_ratio": 0.0,
+            "http_post_ratio": 0.1,
+            "distinct_user_agent": 1.0,
+            "bytes_sent_mean": 4324.0,
+            "global_active_ips": 5.0,
             "burst_rate": 1.0,
-            "sliding_window_count": 10.0,
-            "ip_switch_frequency": 0.0,
             "label": "Normal",
             "label_source": "baseline_normal",
             "confidence": 1.0
@@ -67,20 +67,20 @@ def sample_features():
     data.append({
         "window_start": base_time,
         "src_ip": "172.16.0.99",
-        "login_fail_count": 85.0, # high fail
-        "unique_failed_ip_count": 2.0,
-        "fail_success_ratio": 85.0,
-        "ip_entropy": 0.1,
-        "hour_of_day": 3,
-        "request_rate": 0.0,
-        "status_4xx_rate": 0.0,
-        "url_frequency": 0.0,
-        "user_agent_entropy": 0.0,
-        "method_distribution": 0.0,
-        "time_window_count": 85.0,
-        "burst_rate": 15.0, # high burst
-        "sliding_window_count": 85.0,
-        "ip_switch_frequency": 3.0,
+        "auth_fail_count": 85.0,  # high fail
+        "auth_success_count": 0.0,
+        "auth_fail_ratio": 1.0,
+        "distinct_username": 45.0,  # password spraying
+        "fail_interarrival_mean": 0.7,
+        "fail_interarrival_std": 0.02,  # automated tool regular timing
+        "http_req_rate": 0.0,
+        "http_4xx_ratio": 0.0,
+        "http_5xx_ratio": 0.0,
+        "http_post_ratio": 0.0,
+        "distinct_user_agent": 0.0,
+        "bytes_sent_mean": 0.0,
+        "global_active_ips": 6.0,
+        "burst_rate": 15.0,  # high burst
         "label": "Anomaly",
         "label_source": "lab_scenario",
         "confidence": 1.0
@@ -89,20 +89,20 @@ def sample_features():
     data.append({
         "window_start": base_time,
         "src_ip": "172.16.0.100",
-        "login_fail_count": 0.0,
-        "unique_failed_ip_count": 0.0,
-        "fail_success_ratio": 0.0,
-        "ip_entropy": 0.4,
-        "hour_of_day": 15,
-        "request_rate": 120.0, # high rate
-        "status_4xx_rate": 0.9, # high errors
-        "url_frequency": 0.95, # unique urls (scan)
-        "user_agent_entropy": 0.05,
-        "method_distribution": 0.4,
-        "time_window_count": 7200.0,
+        "auth_fail_count": 0.0,
+        "auth_success_count": 0.0,
+        "auth_fail_ratio": 0.0,
+        "distinct_username": 0.0,
+        "fail_interarrival_mean": 0.0,
+        "fail_interarrival_std": 0.0,
+        "http_req_rate": 120.0,  # high rate
+        "http_4xx_ratio": 0.9,  # high 404 scan
+        "http_5xx_ratio": 0.05,
+        "http_post_ratio": 0.8,  # web brute force post
+        "distinct_user_agent": 5.0,  # cycling UAs
+        "bytes_sent_mean": 120.0,
+        "global_active_ips": 6.0,
         "burst_rate": 8.0,
-        "sliding_window_count": 7200.0,
-        "ip_switch_frequency": 0.0,
         "label": "Anomaly",
         "label_source": "lab_scenario",
         "confidence": 1.0
